@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>DEMO icrop-it</title>
+        <link rel="stylesheet" media="screen" type="text/css" title="style" href="style.css" />
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+        
+    </head>
+    <body style="margin-left:-0px;margin-top:-0px;margin-bottom:-10px;">
+    	<canvas style="margin-left:-0px;margin-top:-0px;margin-bottom:-10px;" id="mon_canvas" ></canvas>
+    	<video style="margin-left:-10px;margin-top:-10px;margin-bottom:-10px;margin-right:-10px;" id="video" width="0" height="0" autoplay></video>
+
+    </body>
+    <!---------------------------------------------------->
+    <!--------------javascript-code----------------------->
+    <!---------------------------------------------------->
+    <script type="text/javascript">
+	   
+	    // -------------------------------------------------------
+	    // ---------------VIDEO-INITIALIATION---------------------
+	    // -------------------------------------------------------
+	    var video = document.getElementById('video');
+	    if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+	    	navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+		    	video.src = window.URL.createObjectURL(stream);
+		    	video.play();
+			  });
+		}
+		 // -------------------------------------------------------
+	    // --------------------CANVAS-CODE------------------------
+	    // -------------------------------------------------------
+	    var c = document.getElementById("mon_canvas");
+	    var ctx = c.getContext("2d");
+	    //core-variable
+	    var sizeX = window.innerWidth;	
+	    var sizeY = window.innerHeight;
+	    ctx.canvas.width  = sizeX;
+		ctx.canvas.height = sizeY;
+	   	var videoWidth = 640;
+		var videoHeight = 480;
+	   	var mulVideoAPI = 0.5;
+	   	var compressionVideoAPI = 0.6;
+	   	var filterValueH = 0.22;
+	   	var mulVideo = 0;
+	   	
+	   	// parameter for points
+	   	var h 	= 0;
+	   	var checker = 0; 
+	   	var sizeMoy = 0;
+	   	var posMoyX = 0;
+	   	var posMoyY = 0;
+	   	var lastImgData;
+	   	var date;
+	   	var dateEnterFrame =  new Date();
+	   	var time = 100;
+	   	var timeLoop = 1;
+	   	var imgsize;
+	   	var checkBad = 0;
+	   	var lock = 0;
+	   	var sizePoints=10;
+	   	var mulVideoAPI_last = mulVideoAPI;
+	   	var p1 = {x: -1, y: 0, mX:-1,mY:0};
+	   	var p2 = {x: -1, y: 0, mX:0,mY:0};
+	   	var p3 = {x: -1, y: 0, mX:0,mY:0};
+	   	var p4 = {x: -1, y: 0, mX:0,mY:0};
+	   	//bandeau ads API
+	   	var imageAd = new Image();
+	   	imageAd.src = "./bandeau3.png";
+	   	var imageAPI = new Image();
+	   	//imageAPI.src = "./image.png";
+	   	var lockAutoCrop = 0;
+	   	
+	   	
+	   	enter_Frame();
+		function enter_Frame(){
+			//update canva and video to real screen size
+			if( window.innerWidth != sizeX || window.innerHeight != sizeY ){
+				sizeX = window.innerWidth;	
+				sizeY = window.innerHeight;
+				ctx.canvas.width  = sizeX;
+				ctx.canvas.height = sizeY;
+			}
+			ctx.fillStyle="rgb(32, 32, 32";
+			ctx.fillRect(0,0,sizeX,sizeY);
+			var decY = 0;
+			var decX = 0;
+			lastImgData = getImageFromVideo(video);
+			decX = (sizeX-lastImgData.width*mulVideo)/2;
+			decY = (sizeY-lastImgData.height*mulVideo)/2;
+			ctx.scale(mulVideo, mulVideo);
+			ctx.drawImage(lastImgData, decX/mulVideo, decY/mulVideo);	
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+						
+			if( h > 0.3 )	checker += 0.0008*timeLoop;
+			if( checker > 1 )	checker = 1;
+			
+			
+			if( checker >= 0.1 ){
+				
+				var mulPos = mulVideo/mulVideoAPI_last;
+				if( p1.mX == -1 ){
+					p1.mX = p1.x*mulPos;
+					p1.mY = p1.y*mulPos;
+					p2.mX = p2.x*mulPos;
+					p2.mY = p2.y*mulPos;
+					p3.mX = p3.x*mulPos;
+					p3.mY = p3.y*mulPos;
+					p4.mX = p4.x*mulPos;
+					p4.mY = p4.y*mulPos;
+				}
+				else{
+					p1.mX += (p1.x*mulPos-p1.mX)*timeLoop/160;
+					p1.mY += (p1.y*mulPos-p1.mY)*timeLoop/160;
+					p2.mX += (p2.x*mulPos-p2.mX)*timeLoop/160;
+					p2.mY += (p2.y*mulPos-p2.mY)*timeLoop/160;
+					p3.mX += (p3.x*mulPos-p3.mX)*timeLoop/160;
+					p3.mY += (p3.y*mulPos-p3.mY)*timeLoop/160;
+					p4.mX += (p4.x*mulPos-p4.mX)*timeLoop/160;
+					p4.mY += (p4.y*mulPos-p4.mY)*timeLoop/160;
+				}
+				var dis = norm(p1.mX,p1.mY,p2.mX,p2.mY)/7;
+				sizePoints += (dis-sizePoints)*timeLoop/160;
+				ctx.fillStyle = "rgba(255, 255, 255, "+0.8+")";
+				if( lockAutoCrop != 2){
+					ctx.beginPath();
+					ctx.arc(decX+p1.mX, decY+p1.mY, sizePoints*0.8, 0, 2 * Math.PI, false);
+					ctx.fill();
+					ctx.beginPath();
+					ctx.arc(decX+p2.mX, decY+p2.mY, sizePoints*0.8, 0, 2 * Math.PI, false);
+					ctx.fill();
+					ctx.beginPath();
+					ctx.arc(decX+p3.mX, decY+p3.mY, sizePoints*0.8, 0, 2 * Math.PI, false);
+					ctx.fill();
+					ctx.beginPath();
+					ctx.arc(decX+p4.mX, decY+p4.mY, sizePoints*0.8, 0, 2 * Math.PI, false);
+					ctx.fill();
+				}
+				var centerX = (p1.mX+p2.mX+p3.mX+p4.mX)/4;
+				var centerY = (p1.mY+p2.mY+p3.mY+p4.mY)/4;
+				if( lockAutoCrop != 2){
+					ctx.beginPath();
+					ctx.arc(decX+centerX, decY+centerY, sizePoints*2, 0, 2 * Math.PI, false);
+					ctx.fill();
+					ctx.fillStyle = "rgba(255, 100, 255, "+0.6+")";
+					ctx.beginPath();
+					ctx.arc(decX+centerX, decY+centerY, checker*sizePoints*1.5, 0, 2 * Math.PI, false);
+					ctx.fill();
+				}
+				if( lockAutoCrop == 2){
+					var scaleimgAPI = sizePoints*6/imageAPI.width;
+					ctx.scale(scaleimgAPI, scaleimgAPI);
+					
+					
+					ctx.beginPath();
+				   	ctx.rect((decX+centerX)/scaleimgAPI - (imageAPI.width)/2 - 6 , (decY+centerY)/scaleimgAPI - (imageAPI.height)/2 - 6, imageAPI.width + 12, imageAPI.height + 12);
+				   	ctx.fillStyle="rgba(255, 255, 255, "+0.6+")";
+				   	ctx.fill();
+
+					
+					ctx.drawImage(imageAPI, (decX+centerX)/scaleimgAPI - (imageAPI.width)/2,(decY+centerY)/scaleimgAPI - (imageAPI.height)/2);
+					ctx.setTransform(1, 0, 0, 1, 0, 0);
+					/*ctx.beginPath();
+					ctx.fillStyle="rgba(255, 255, 255, "+0.9+")";
+					ctx.arc(decX+centerX, decY+centerY, sizePoints*0.6, 0, 2 * Math.PI, false);
+					ctx.fill();*/
+				}
+				
+							
+			}
+			
+
+			ctx.fillStyle = '#EEEEEE';
+		   	ctx.font="10px Arial";
+		   	ctx.fillText("API Statistics:"+parseInt(time)+"ms ["+parseInt(mulVideoAPI*videoWidth)+"w/"+parseInt(mulVideoAPI*videoHeight) +"h] JPGc_"+compressionVideoAPI+"/"+imgsize+"Ko", 5, 10);
+		   	ctx.fillText("fps:"+parseInt(timeLoop), 5, 20);
+		   	
+		   	ctx.beginPath();
+		   	var sizeB = lastImgData.height*mulVideo*0.14;
+		   	ctx.rect(decX-1,1+decY+lastImgData.height*mulVideo-sizeB,2+lastImgData.width*mulVideo,sizeB);
+		   	ctx.fillStyle="rgba(32, 32, 32, "+0.6+")";
+		   	ctx.fill();
+		   	
+		   	var scaleImgAPI = sizeB/imageAd.height;
+		   	if( scaleImgAPI > sizeX/imageAd.width ) scaleImgAPI = sizeX/imageAd.width;
+		   	ctx.scale(scaleImgAPI, scaleImgAPI);
+		   	var decXB = (sizeX - (imageAd.width*scaleImgAPI) )/2;
+		   	//alert((imageAPI.width*scaleImgAPI)+"  "+(sizeX));
+		   	ctx.drawImage(imageAd, decXB/scaleImgAPI,(1+decY+lastImgData.height*mulVideo-sizeB)/scaleImgAPI);
+		   	ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+		   	timeLoop += (((new Date())-dateEnterFrame)-timeLoop)/10;	//means
+			dateEnterFrame = new Date();  				    	
+		   
+		   		
+		   	
+			if( lock == 0 )	call_icrop_it_API(getBase64imgFromVideo(video,mulVideoAPI)); 
+			
+						
+			requestAnimationFrame(enter_Frame);
+		}
+		//----------------------------------
+		//----------------------------------
+		
+		
+		
+		
+		// -------------------------------------------------------
+	    // ---------------javascript-function---------------------
+	    // -------------------------------------------------------
+	    function getBase64imgFromVideo(video,mul) {
+		   	var canvas = document.createElement('canvas');
+		    var ctx_2 = canvas.getContext('2d');
+		    var width = videoWidth*mul;
+		    var height = videoHeight*mul;
+		    if( sizeY > sizeX ){	
+		   		canvas.width = height;
+		   		canvas.height = width
+		   		ctx_2.drawImage(video, 0, 0, height, width);
+		   	}
+		   	else{					//landscape
+			   	canvas.width = width;
+		   		canvas.height = height;
+		   		ctx_2.drawImage(video, 0, 0, width, height);
+		   	}
+		    return canvas.toDataURL("image/jpeg",compressionVideoAPI);
+		}
+		// -------------------------------------------------------
+		function getImageFromVideo(video) {
+		   	var canvas = document.createElement('canvas');
+		   	var ctx_2 = canvas.getContext('2d');
+		   	if( sizeY > sizeX ){	//mode rotation 90deg
+		   		mulVideo = sizeX / videoHeight;	
+		   		if( mulVideo > sizeY / videoWidth ) mulVideo = sizeY / videoWidth;
+		   		canvas.height = videoWidth;
+		   		canvas.width = videoHeight;
+		   		ctx_2.drawImage(video, 0,0,videoHeight,videoWidth  );
+		   		return canvas;
+			}
+		   	else{	
+		   		mulVideo = sizeY / videoHeight;	
+		   		if( mulVideo > sizeX / videoWidth ) mulVideo = sizeX / videoWidth;
+		   		canvas.width = videoWidth;
+		   		canvas.height = videoHeight;
+		   		ctx_2.drawImage(video, 0, 0, videoWidth, videoHeight);
+		   		return canvas;
+		    }
+		}
+		// -------------------------------------------------------
+		function call_icrop_it_API( imageData){
+		var url = 'http://icrop-it.com/SCANAPI/web/index.php/4points';                
+		var obj = new Object();
+		obj.api_key 		= "5a008e6009f4941293c0345362c8c857";
+		obj.image_base64  	= imageData;
+		lock = 1;
+		imgsize = parseInt(imageData.length/1000);
+		date  = new Date();
+		$.ajax({    url: url, 
+					type: 'post',
+					dataType: 'json',
+            		data: obj,
+            		cache: false,
+				    success: function(result){
+				    	h = parseFloat(result.heuristic);
+				    	if( h <= filterValueH ) {
+					    	checker = 0;
+					    	p1.mX = -1;
+					    	lockAutoCrop = 0;
+					    	imageAPI.src = "";
+				    	}
+				    	else{
+				    		if( checker >= 0.8 && lockAutoCrop == 0)	{
+				    			call_icrop_it_API_autoCrop(getBase64imgFromVideo(video,1));
+				    		}	
+				    		
+				    		checkBad = 0;
+				    		if( p1.mX == -1 ){
+				    			updatePoint(p1, parseInt(result.points.upleft.x),parseInt(result.points.upleft.y));
+				    			updatePoint(p2, parseInt(result.points.upright.x),parseInt(result.points.upright.y));
+				    			updatePoint(p3, parseInt(result.points.bottomright.x),parseInt(result.points.bottomright.y));
+				    			updatePoint(p4, parseInt(result.points.bottomleft.x),parseInt(result.points.bottomleft.y));
+				    			var centerX = (p1.x+p2.x+p3.x+p4.x)/4;
+				    			var centerY = (p1.y+p2.y+p3.y+p4.y)/4;
+				    			p1.x = centerX;
+				    			p1.y = centerY;
+				    			p2.x = centerX;
+				    			p2.y = centerY;
+				    			p3.x = centerX;
+				    			p3.y = centerY;
+				    			p4.x = centerX;
+				    			p4.y = centerY;
+				    		}
+				    		else{
+					    		var p1_t = {x: result.points.upleft.x, y: result.points.upleft.y};
+					    		var p2_t = {x: result.points.upright.x, y: result.points.upright.y};
+					    		var p3_t = {x: result.points.bottomright.x, y: result.points.bottomright.y};
+					    		var p4_t = {x: result.points.bottomleft.x, y: result.points.bottomleft.y};
+					    		var arr = [p1_t, p2_t, p3_t,p4_t];
+					    		updatePointDis(p1, arr);
+					    		updatePointDis(p2, arr);
+					    		updatePointDis(p3, arr);
+					    		updatePointDis(p4, arr);
+				    		}
+				    	}
+				    				    	
+				    	lock = 0;
+				    	
+				    	time += (((new Date())-date)-time)/10;	//means
+				    	mulVideoAPI_last = mulVideoAPI;
+				    	
+				    	if( time < 130 ) 	mulVideoAPI += 0.05;
+				    	if( time > 130 )	mulVideoAPI -= 0.05;
+				    	if( mulVideoAPI < 0.4 )	mulVideoAPI =  0.4;
+				    	if( mulVideoAPI > 1 )	mulVideoAPI =  1;
+				    	
+				    }
+				    });					
+		}
+		function call_icrop_it_API_autoCrop( imageData){
+		var url = 'http://icrop-it.com/SCANAPI/web/index.php/autocrop';                
+		var obj = new Object();
+		obj.api_key 		= "5a008e6009f4941293c0345362c8c857";
+		obj.image_base64  	= imageData;
+		lockAutoCrop = 1;
+		imgsize = parseInt(imageData.length/1000);
+		date  = new Date();
+		$.ajax({    url: url, 
+					type: 'post',
+					dataType: 'json',
+            		data: obj,
+            		cache: false,
+				    success: function(result){
+				    //alert(parseFloat(result.heuristic));
+				    	if( parseFloat(result.heuristic) >= 0.4 ){
+				    		lockAutoCrop = 2;
+				    		imageAPI.src = "data:image/jpg;base64,"+result.imgage64_croped;
+				    	}
+				    	else{
+					    	lockAutoCrop = 0;
+					    	
+				    	}
+				    }});					
+		}
+		// -------------------------------------------------------
+		function updatePoint(point, v_x, v_y){
+			point.x = v_x;
+			point.y = v_y;
+		}
+		function updatePointDis(p, arr){
+			var pos = 0;
+			var value = norm(p.x,p.y,arr[0].x,arr[0].y);
+			for(var k = 1 ; k < arr.length ; k++){
+				var value_t = norm(p.x,p.y,arr[k].x,arr[k].y);
+				if( value_t < value ){
+					pos = k;
+					value = value_t;
+				}
+			}
+			p.x = arr[pos].x;
+			p.y = arr[pos].y;
+			arr.splice(pos, 1);
+		}
+		function norm(x1,y1,x2,y2){
+			return Math.sqrt( (x1-x2) * (x1-x2) + (y1-y2) * (y1-y2) );
+		}
+		// -------------------------------------------------------
+		// -------------------------------------------------------
+	</script>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
